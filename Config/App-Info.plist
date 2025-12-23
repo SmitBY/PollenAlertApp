@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>GOOGLE_MAPS_API_KEY</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
+	<key>TOMORROW_API_KEY</key>
+	<string>$(TOMORROW_API_KEY)</string>
+	<key>AMBEE_API_KEY</key>
+	<string>$(AMBEE_API_KEY)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Нам нужно ваше местоположение, чтобы показать уровень пыльцы именно там, где вы находитесь.</string>
+</dict>
+</plist>

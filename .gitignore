@@ -1,0 +1,21 @@
+# Xcode
+build/
+DerivedData/
+*.moved-aside
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Project Specific
+Config/Keys.xcconfig
+
+# Dependencies
+.swiftpm/
+.build/
+
+# OS
+.DS_Store
+
