@@ -5,6 +5,8 @@ import Observation
 @Observable
 @MainActor
 class LocationManager: NSObject, CLLocationManagerDelegate {
+    static let shared = LocationManager()
+    
     private let manager = CLLocationManager()
     var lastLocation: CLLocation?
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -17,12 +19,14 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
     
     func requestPermission() {
-        manager.requestWhenInUseAuthorization()
+        manager.requestAlwaysAuthorization()
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
         if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+            manager.allowsBackgroundLocationUpdates = true
+            manager.pausesLocationUpdatesAutomatically = false
             manager.startUpdatingLocation()
         }
     }

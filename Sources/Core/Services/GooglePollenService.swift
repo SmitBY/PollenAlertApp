@@ -6,7 +6,7 @@ enum GooglePollenError: Error {
     case decodingError
 }
 
-class GooglePollenService {
+final class GooglePollenService: Sendable {
     static let shared = GooglePollenService()
     
     private let apiKey: String

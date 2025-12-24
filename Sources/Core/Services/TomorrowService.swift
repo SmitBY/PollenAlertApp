@@ -6,7 +6,7 @@ enum TomorrowError: Error {
     case decodingError
 }
 
-class TomorrowService {
+final class TomorrowService: Sendable {
     static let shared = TomorrowService()
     
     private let apiKey: String

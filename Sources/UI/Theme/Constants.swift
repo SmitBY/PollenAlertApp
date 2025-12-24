@@ -6,6 +6,9 @@ struct Constants {
     static let grassWeight: Double = 0.3
     static let weedWeight: Double = 0.3
     
+    // Фактор влияния воздуха (0.005 означает +50% риска при AQI 100)
+    static let aqiImpactFactor: Double = 0.005
+    
     // Фактор ветра
     static let windFactor: Double = 0.1
     

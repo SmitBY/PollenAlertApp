@@ -4,7 +4,7 @@ import Observation
 
 @Observable
 @MainActor
-class PersonalRiskService {
+final class PersonalRiskService {
     static let shared = PersonalRiskService()
     
     private let dbManager = DatabaseManager.shared

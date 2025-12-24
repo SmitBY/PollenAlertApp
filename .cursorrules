@@ -15,7 +15,7 @@
 - `Sources/Core/`: Бизнес-логика.
     - `Sources/Core/Model/`: Модели данных (PollenTile, DiaryEntry). Используют CodingKeys для маппинга в snake_case (БД).
     - `Sources/Core/Storage/`: Работа с SQLite (DatabaseManager).
-    - `Sources/Core/Services/`: Внешние API (Google Pollen, Tomorrow.io), LocationManager, NotificationService, PersonalRiskService.
+    - `Sources/Core/Services/`: Внешние API (Google Pollen, Google Air Quality, Tomorrow.io), LocationManager, NotificationService, PersonalRiskService, BackgroundRefreshService.
     - `Sources/Core/Algorithms/`: Алгоритмы расчета риска и H3.
 - `Sources/UI/`: Пользовательский интерфейс.
     - `Sources/UI/Screens/`: Основные экраны (MapView, DiaryView, HistoryView).
@@ -48,16 +48,21 @@
 - Инициализация через `GMSMapViewOptions`.
 - Стиль карты загружается из `MapStyle.json`.
 
-### Google Pollen API
-- Является основным источником данных. Tomorrow.io — резервный.
-- Требует заголовок `X-Ios-Bundle-Identifier` для корректной работы с ограниченными ключами.
+### Google Pollen & Air Quality API
+- Являются основными источниками данных. Tomorrow.io — резервный для пыльцы.
+- Требуют заголовок `X-Ios-Bundle-Identifier` для корректной работы с ограниченными ключами.
+- Air Quality API использует POST запрос к `currentConditions:lookup`.
 
 ## Алгоритм оценки риска (Кратко)
 1. Нормализация данных (0-5 -> 0-500).
 2. Z-фильтр (временной): `(p[t-1] + p[t] + p[t+1]) / 3`.
 3. Ветровая коррекция: учет соседних H3-тайлов.
-4. Итоговая формула: `tree * 0.4 + grass * 0.3 + weed * 0.3`.
+4. **Итоговая формула**: `(tree*0.4 + grass*0.3 + weed*0.3) * (1 + AQI*0.005)`. Учет синергии пыльцы и загрязнения воздуха.
 5. **Байесовское обновление**: `PersonalRiskService` корректирует порог `riskThreshold` на основе записей в `DiaryEntry`.
 
 ## Уведомления
 - `NotificationService` отвечает за запрос разрешений и отправку пушей при превышении персонального уровня риска (>80%).
+
+## Фоновые задачи и Геолокация
+- **Background Refresh**: Использование `BackgroundRefreshService` (задача `com.pollenalert.refresh`) для ежечасного обновления данных.
+- **Геолокация**: Для фоновой работы используется разрешение `Always`. В `LocationManager` должны быть включены `allowsBackgroundLocationUpdates` и отключено `pausesLocationUpdatesAutomatically`.

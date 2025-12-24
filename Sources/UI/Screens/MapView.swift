@@ -4,12 +4,12 @@ import Observation
 
 struct MapView: View {
     @State private var viewModel = MapViewModel()
-    @State private var locationManager = LocationManager()
+    private var locationManager = LocationManager.shared
     @State private var cameraPosition = GMSCameraPosition.camera(withLatitude: 55.751244, longitude: 37.618423, zoom: 12.0)
     @State private var isShowingDiary = false
     @State private var isShowingHistory = false
     @State private var isDetailsExpanded = false
-    @State private var hasCenteredOnUser = false
+    @State private var lastCenteringTime: Date = .distantPast
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -136,6 +136,9 @@ struct MapView: View {
                                 DetailItem(title: "Деревья", value: Int(firstTile.treeIndex * 100))
                                 DetailItem(title: "Трава", value: Int(firstTile.grassIndex * 100))
                                 DetailItem(title: "Сорняки", value: Int(firstTile.weedIndex * 100))
+                                if let aqi = firstTile.aqi {
+                                    DetailItem(title: "Воздух", value: aqi)
+                                }
                             }
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
@@ -166,20 +169,30 @@ struct MapView: View {
             }
         }
         .sheet(isPresented: $isShowingHistory) {
-            HistoryView()
+            let h3Index = locationManager.lastLocation.map {
+                GeoUtils.latLonToH3(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude)
+            }
+            HistoryView(currentH3Index: h3Index)
         }
         .onAppear {
             locationManager.requestPermission()
             NotificationService.shared.requestAuthorization()
         }
         .onChange(of: locationManager.lastLocation) { oldLoc, newLoc in
-            if let loc = newLoc {
-                // Автоматическое центрирование при первом получении координат
-                if !hasCenteredOnUser {
-                    cameraPosition = GMSCameraPosition.camera(withTarget: loc.coordinate, zoom: 12.0)
-                    hasCenteredOnUser = true
-                }
-                
+            guard let loc = newLoc else { return }
+            
+            let now = Date()
+            
+            // 1. Центрирование раз в 10 секунд (если переместились более чем на 5 метров)
+            let centeringDistance = oldLoc?.distance(from: loc) ?? .infinity
+            if now.timeIntervalSince(lastCenteringTime) >= 10 && centeringDistance > 5 {
+                cameraPosition = GMSCameraPosition.camera(withTarget: loc.coordinate, zoom: 12.0)
+                lastCenteringTime = now
+            }
+            
+            // 2. Обновление данных (пыльца) при перемещении на 50+ метров
+            let updateDistance = oldLoc?.distance(from: loc) ?? .infinity
+            if updateDistance > 50 {
                 Task {
                     await viewModel.updateVisibleRegion(
                         lat: loc.coordinate.latitude,
@@ -227,7 +240,8 @@ struct GoogleMapsView: UIViewRepresentable {
     
     // Координатор для управления полигонами, чтобы избежать пересоздания карты
     class Coordinator {
-        var polygons: [GMSPolygon] = []
+        var polygons: [String: GMSPolygon] = [:]
+        var lastTiles: [PollenTile] = []
     }
     
     func makeCoordinator() -> Coordinator {
@@ -246,9 +260,11 @@ struct GoogleMapsView: UIViewRepresentable {
         }
         mapView.isMyLocationEnabled = true
         
-        // Настройка для уменьшения телеметрии (если возможно)
+        // Настройка для уменьшения телеметрии и повышения плавности
         mapView.settings.compassButton = false
         mapView.settings.myLocationButton = false
+        mapView.isBuildingsEnabled = false
+        mapView.isTrafficEnabled = false
         
         return mapView
     }
@@ -264,31 +280,46 @@ struct GoogleMapsView: UIViewRepresentable {
             uiView.animate(to: cameraPosition)
         }
         
-        // Удаляем старые полигоны
-        for polygon in context.coordinator.polygons {
-            polygon.map = nil
-        }
-        context.coordinator.polygons.removeAll()
+        // Оптимизация: обновляем полигоны только если данные изменились
+        guard context.coordinator.lastTiles != tiles else { return }
         
-        // Создаем новые полигоны
+        let newTileIndices = Set(tiles.map { $0.h3Index })
+        let oldTileIndices = Set(context.coordinator.lastTiles.map { $0.h3Index })
+        
+        // 1. Удаляем полигоны, которых больше нет
+        for index in oldTileIndices where !newTileIndices.contains(index) {
+            context.coordinator.polygons[index]?.map = nil
+            context.coordinator.polygons.removeValue(forKey: index)
+        }
+        
+        // 2. Добавляем или обновляем полигоны
         for tile in tiles {
-            let coords = GeoUtils.getBoundary(for: tile.h3Index)
-            let path = GMSMutablePath()
-            for coord in coords {
-                path.add(coord)
-            }
-            
-            let polygon = GMSPolygon(path: path)
             let personalLevel = PersonalRiskService.shared.getPersonalRiskLevel(for: tile)
             let color = colorForRisk(personalLevel)
             
-            polygon.fillColor = color.withAlphaComponent(0.3)
-            polygon.strokeColor = color
-            polygon.strokeWidth = 2
-            polygon.map = uiView
-            
-            context.coordinator.polygons.append(polygon)
+            if let existingPolygon = context.coordinator.polygons[tile.h3Index] {
+                // Если полигон уже есть, обновляем только цвет если он изменился
+                existingPolygon.fillColor = color.withAlphaComponent(0.3)
+                existingPolygon.strokeColor = color
+            } else {
+                // Создаем новый полигон
+                let coords = GeoUtils.getBoundary(for: tile.h3Index)
+                let path = GMSMutablePath()
+                for coord in coords {
+                    path.add(coord)
+                }
+                
+                let polygon = GMSPolygon(path: path)
+                polygon.fillColor = color.withAlphaComponent(0.3)
+                polygon.strokeColor = color
+                polygon.strokeWidth = 2
+                polygon.map = uiView
+                
+                context.coordinator.polygons[tile.h3Index] = polygon
+            }
         }
+        
+        context.coordinator.lastTiles = tiles
     }
     
     private func colorForRisk(_ level: Double) -> UIColor {

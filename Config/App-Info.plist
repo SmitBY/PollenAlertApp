@@ -19,5 +19,17 @@
 	<string>$(AMBEE_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Нам нужно ваше местоположение, чтобы показать уровень пыльцы именно там, где вы находитесь.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Нам нужно ваше местоположение в фоновом режиме, чтобы уведомлять вас о высоком уровне пыльцы.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>location</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.pollenalert.refresh</string>
+	</array>
 </dict>
 </plist>

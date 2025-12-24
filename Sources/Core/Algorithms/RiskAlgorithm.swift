@@ -1,15 +1,22 @@
 import Foundation
 
 struct RiskAlgorithm {
-    /// Итоговая формула: tree * 0.4 + grass * 0.3 + weed * 0.3
-    static func calculateRisk(tree: Double, grass: Double, weed: Double) -> Double {
+    /// Итоговая формула с учетом качества воздуха (AQI)
+    static func calculateRisk(tree: Double, grass: Double, weed: Double, aqi: Int?) -> Double {
         let normalizedTree = normalize(tree)
         let normalizedGrass = normalize(grass)
         let normalizedWeed = normalize(weed)
         
-        return normalizedTree * Constants.treeWeight +
-               normalizedGrass * Constants.grassWeight +
-               normalizedWeed * Constants.weedWeight
+        let baseRisk = normalizedTree * Constants.treeWeight +
+                       normalizedGrass * Constants.grassWeight +
+                       normalizedWeed * Constants.weedWeight
+        
+        // Применяем AQI как множитель: Risk = Base * (1 + AQI * factor)
+        // Если AQI нет, множитель будет 1.0 (без изменений)
+        let aqiValue = Double(aqi ?? 0)
+        let airCorrection = 1.0 + (aqiValue * Constants.aqiImpactFactor)
+        
+        return baseRisk * airCorrection
     }
     
     /// Нормализация данных (0-5 -> 0-500)

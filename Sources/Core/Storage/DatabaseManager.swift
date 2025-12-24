@@ -1,10 +1,10 @@
 import Foundation
 import GRDB
 
-class DatabaseManager {
+final class DatabaseManager: Sendable {
     static let shared = DatabaseManager()
     
-    var dbQueue: DatabaseQueue
+    let dbQueue: DatabaseQueue
     
     private init() {
         do {
@@ -42,6 +42,29 @@ class DatabaseManager {
                 t.column("feeling_score", .integer).notNull() // 0-5
                 t.column("symptoms", .text)
                 t.column("h3_index", .text).notNull()
+            }
+        }
+        
+        migrator.registerMigration("v2") { db in
+            // Таблица для хранения истории изменения пыльцы
+            try db.create(table: "pollen_history") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("h3_index", .text).notNull().indexed()
+                t.column("tree_index", .double).notNull()
+                t.column("grass_index", .double).notNull()
+                t.column("weed_index", .double).notNull()
+                t.column("risk_level", .double).notNull()
+                t.column("date", .datetime).notNull().indexed()
+            }
+        }
+        
+        migrator.registerMigration("v3") { db in
+            // Добавляем AQI (Air Quality Index) в существующие таблицы
+            try db.alter(table: "pollen_tiles") { t in
+                t.add(column: "aqi", .integer)
+            }
+            try db.alter(table: "pollen_history") { t in
+                t.add(column: "aqi", .integer)
             }
         }
         
