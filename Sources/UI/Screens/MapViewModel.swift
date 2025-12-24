@@ -19,6 +19,40 @@ class MapViewModel {
             // Обновляем данные для центральной точки
             try await repository.updatePollenData(lat: lat, lon: lon)
             
+            // Загружаем тайлы для отображения
+            await loadTilesForLocation(lat: lat, lon: lon)
+        } catch {
+            print("Failed to update map data: \(error)")
+        }
+        
+        isUpdating = false
+    }
+    
+    /// Загрузить последние данные из БД для текущей локации. Если данных нет или они устарели - обновить через API
+    func loadLastData(lat: Double, lon: Double) async {
+        let centerH3 = GeoUtils.latLonToH3(lat: lat, lon: lon)
+        
+        // Пытаемся загрузить данные из БД
+        await loadTilesForLocation(lat: lat, lon: lon)
+        
+        // Проверяем, есть ли данные для центральной точки
+        let hasCenterTile = tiles.contains { $0.h3Index == centerH3 }
+        
+        // Проверяем, не устарели ли данные (старше 2 часов)
+        let isDataStale = tiles.first { $0.h3Index == centerH3 }
+            .map { Date().timeIntervalSince($0.updatedAt) > 7200 } ?? true
+        
+        // Если данных нет или они устарели - обновляем через API
+        if !hasCenterTile || isDataStale {
+            print("📥 Данных нет или они устарели, обновляем через API...")
+            await updateVisibleRegion(lat: lat, lon: lon)
+        } else {
+            print("✅ Используем данные из БД")
+        }
+    }
+    
+    private func loadTilesForLocation(lat: Double, lon: Double) async {
+        do {
             // Получаем соседей для отображения сетки вокруг пользователя
             let centerH3 = GeoUtils.latLonToH3(lat: lat, lon: lon)
             let neighbors = GeoUtils.getNeighbors(for: centerH3)
@@ -33,10 +67,8 @@ class MapViewModel {
             
             self.tiles = newTiles
         } catch {
-            print("Failed to update map data: \(error)")
+            print("Failed to load tiles from DB: \(error)")
         }
-        
-        isUpdating = false
     }
 }
 

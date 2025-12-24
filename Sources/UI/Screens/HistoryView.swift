@@ -42,8 +42,8 @@ struct HistoryView: View {
                 if !viewModel.pollenHistory.isEmpty {
                     Section("Динамика риска") {
                         PollenHistoryChart(history: viewModel.pollenHistory)
-                            .frame(height: 200)
-                            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                            .frame(height: 180)
+                            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 0, trailing: 16))
                     }
                 }
                 
@@ -79,6 +79,47 @@ struct HistoryView: View {
 struct PollenHistoryChart: View {
     let history: [PollenHistory]
     
+    private var dateRange: ClosedRange<Date>? {
+        guard let last = history.last?.date else { return nil }
+        let start = last.addingTimeInterval(-24 * 3600)
+        return start...last
+    }
+    
+    private var axisDates: [Date] {
+        guard let range = dateRange else { return [] }
+        
+        var dates: [Date] = []
+        let calendar = Calendar.current
+        
+        // Округляем начало до ближайшего четного часа
+        var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
+        if let hour = components.hour, hour % 2 != 0 {
+            components.hour = hour + 1
+        }
+        components.minute = 0
+        components.second = 0
+        
+        var current = calendar.date(from: components) ?? range.lowerBound
+        
+        while current <= range.upperBound {
+            dates.append(current)
+            guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
+            current = next
+        }
+        
+        return dates
+    }
+    
+    private var yDomain: ClosedRange<Double> {
+        let minRisk = history.map { $0.riskLevel }.min() ?? 0
+        let maxRisk = history.map { $0.riskLevel }.max() ?? 0
+        // Если риск всегда 0, показываем диапазон 0-10 чтобы линия не прилипала к самому низу
+        if minRisk == 0 && maxRisk == 0 {
+            return -2...100
+        }
+        return min(0, minRisk - 5)...max(100, maxRisk + 5)
+    }
+    
     var body: some View {
         Chart {
             ForEach(history) { point in
@@ -87,7 +128,15 @@ struct PollenHistoryChart: View {
                     y: .value("Риск", point.riskLevel)
                 )
                 .foregroundStyle(riskColor(point.riskLevel))
-                .interpolationMethod(.monotone) // Более производительная интерполяция
+                .lineStyle(StrokeStyle(lineWidth: 3)) // Делаем линию толще
+                .interpolationMethod(.monotone)
+                
+                PointMark(
+                    x: .value("Время", point.date),
+                    y: .value("Риск", point.riskLevel)
+                )
+                .foregroundStyle(riskColor(point.riskLevel))
+                .symbolSize(10) // Добавляем точки чтобы видеть измерения
                 
                 AreaMark(
                     x: .value("Время", point.date),
@@ -98,23 +147,34 @@ struct PollenHistoryChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .stride(by: .hour, count: 6)) { value in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel(format: .dateTime.hour().minute())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(values: [0, 25, 50, 75, 100]) { value in
-                AxisGridLine()
+            AxisMarks(values: axisDates) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.primary.opacity(0.1))
                 AxisValueLabel {
-                    if let risk = value.as(Double.self) {
-                        Text("\(Int(risk))%")
+                    if let date = value.as(Date.self) {
+                        Text(date.formatted(.dateTime.hour()))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .chartYScale(domain: 0...100)
+        .chartYAxis {
+            AxisMarks(values: [0, 25, 50, 75, 100]) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.primary.opacity(0.1))
+                AxisValueLabel {
+                    if let risk = value.as(Double.self) {
+                        Text("\(Int(risk))%")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .chartXScale(domain: dateRange ?? (Date()...Date()))
+        .chartYScale(domain: yDomain)
+        .environment(\.timeZone, TimeZone.current)
     }
     
     private func riskColor(_ level: Double) -> Color {
@@ -180,3 +240,4 @@ struct HistoryRow: View {
 #Preview {
     HistoryView()
 }
+

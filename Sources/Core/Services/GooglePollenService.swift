@@ -7,7 +7,7 @@ enum GooglePollenError: Error {
 }
 
 final class GooglePollenService: Sendable {
-    static let shared = GooglePollenService()
+    nonisolated static let shared = GooglePollenService()
     
     private let apiKey: String
     private let baseURL = "https://pollen.googleapis.com/v1/forecast:lookup"

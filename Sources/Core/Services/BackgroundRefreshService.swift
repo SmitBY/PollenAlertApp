@@ -3,7 +3,7 @@ import BackgroundTasks
 import CoreLocation
 
 final class BackgroundRefreshService: Sendable {
-    static let shared = BackgroundRefreshService()
+    nonisolated static let shared = BackgroundRefreshService()
     static let taskIdentifier = "com.pollenalert.refresh"
     
     private let pollenRepository = PollenRepository.shared
@@ -17,15 +17,59 @@ final class BackgroundRefreshService: Sendable {
         }
     }
     
-    /// Планирование следующего обновления
+    /// Планирование следующего обновления на следующее целое время (12:00, 13:00, 14:00...)
     func schedule() {
-        let request = BGAppRefreshTaskRequest(identifier: Self.taskIdentifier)
-        // Интервал - 1 час (3600 секунд)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 3600)
+        // Сначала отменяем все существующие задачи с этим идентификатором
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskIdentifier)
         
+        // Небольшая задержка перед планированием новой задачи
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+            self.performSchedule()
+        }
+    }
+    
+    private func performSchedule() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.taskIdentifier)
+        
+        // Вычисляем следующее целое время (например, если сейчас 12:30, то следующее обновление в 13:00)
+        let calendar = Calendar.current
+        let now = Date()
+        let components = calendar.dateComponents([.year, .month, .day, .hour], from: now)
+        
+        guard let currentHour = components.hour else {
+            // Fallback: через час
+            request.earliestBeginDate = Date(timeIntervalSinceNow: 3600)
+            submitRequest(request)
+            return
+        }
+        
+        // Следующий час
+        var nextHourComponents = components
+        nextHourComponents.hour = currentHour + 1
+        nextHourComponents.minute = 0
+        nextHourComponents.second = 0
+        
+        if let nextHourDate = calendar.date(from: nextHourComponents) {
+            request.earliestBeginDate = nextHourDate
+        } else {
+            // Fallback: через час
+            request.earliestBeginDate = Date(timeIntervalSinceNow: 3600)
+        }
+        
+        submitRequest(request)
+    }
+    
+    private func submitRequest(_ request: BGAppRefreshTaskRequest) {
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("⏰ Фоновая задача запланирована на через час")
+            print("✅ Фоновая задача успешно запланирована на \(request.earliestBeginDate?.formatted() ?? "неизвестно")")
+        } catch let error as NSError {
+            if error.code == 1 {
+                // Задача уже запланирована - это нормально, не критичная ошибка
+                print("ℹ️ Фоновая задача уже запланирована (Code=1 - это нормально)")
+            } else {
+                print("❌ Не удалось запланировать фоновую задачу: \(error.domain) Code=\(error.code)")
+            }
         } catch {
             print("❌ Не удалось запланировать фоновую задачу: \(error)")
         }

@@ -177,6 +177,17 @@ struct MapView: View {
         .onAppear {
             locationManager.requestPermission()
             NotificationService.shared.requestAuthorization()
+            
+            // Загружаем последние данные из БД при открытии приложения
+            // Если локация еще не определена, данные загрузятся после получения локации
+            if let loc = locationManager.lastLocation {
+                Task {
+                    await viewModel.loadLastData(
+                        lat: loc.coordinate.latitude,
+                        lon: loc.coordinate.longitude
+                    )
+                }
+            }
         }
         .onChange(of: locationManager.lastLocation) { oldLoc, newLoc in
             guard let loc = newLoc else { return }
@@ -190,14 +201,25 @@ struct MapView: View {
                 lastCenteringTime = now
             }
             
-            // 2. Обновление данных (пыльца) при перемещении на 50+ метров
-            let updateDistance = oldLoc?.distance(from: loc) ?? .infinity
-            if updateDistance > 50 {
+            // 2. Если это первое получение локации - загружаем данные (с проверкой БД)
+            if oldLoc == nil {
                 Task {
-                    await viewModel.updateVisibleRegion(
+                    await viewModel.loadLastData(
                         lat: loc.coordinate.latitude,
                         lon: loc.coordinate.longitude
                     )
+                }
+            }
+            // 3. Обновление данных (пыльца) при перемещении на 50+ метров
+            else {
+                let updateDistance = oldLoc?.distance(from: loc) ?? .infinity
+                if updateDistance > 50 {
+                    Task {
+                        await viewModel.updateVisibleRegion(
+                            lat: loc.coordinate.latitude,
+                            lon: loc.coordinate.longitude
+                        )
+                    }
                 }
             }
         }

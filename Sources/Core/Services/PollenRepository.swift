@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 final class PollenRepository: Sendable {
-    static let shared = PollenRepository()
+    nonisolated static let shared = PollenRepository()
     private let dbManager = DatabaseManager.shared
     private let googlePollenService = GooglePollenService.shared
     private let airQualityService = AirQualityService.shared
@@ -74,9 +74,11 @@ final class PollenRepository: Sendable {
         )
         
         // 7. Проверка персонального риска для уведомления
-        let personalLevel = await PersonalRiskService.shared.getPersonalRiskLevel(for: tile)
-        if personalLevel > 80 {
-            await NotificationService.shared.notifyHighRisk(level: personalLevel)
+        await MainActor.run {
+            let personalLevel = PersonalRiskService.shared.getPersonalRiskLevel(for: tile)
+            if personalLevel > 80 {
+                NotificationService.shared.notifyHighRisk(level: personalLevel)
+            }
         }
 
         try await dbManager.dbQueue.write { db in

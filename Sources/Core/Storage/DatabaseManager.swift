@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 final class DatabaseManager: Sendable {
-    static let shared = DatabaseManager()
+    nonisolated static let shared = DatabaseManager()
     
     let dbQueue: DatabaseQueue
     

@@ -7,7 +7,7 @@ enum TomorrowError: Error {
 }
 
 final class TomorrowService: Sendable {
-    static let shared = TomorrowService()
+    nonisolated static let shared = TomorrowService()
     
     private let apiKey: String
     private let baseURL = "https://api.tomorrow.io/v4/weather/realtime"

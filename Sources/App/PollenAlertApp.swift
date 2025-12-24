@@ -23,6 +23,9 @@ struct PollenAlertApp: App {
         
         // Регистрация фоновой задачи
         BackgroundRefreshService.shared.register()
+        
+        // Планируем первое обновление
+        BackgroundRefreshService.shared.schedule()
     }
 
     var body: some Scene {
@@ -30,9 +33,16 @@ struct PollenAlertApp: App {
             MapView()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
-            if newPhase == .background {
-                // Планируем обновление, когда приложение уходит в фон
+            switch newPhase {
+            case .active:
+                // Приложение открыто - запускаем таймер для обновления каждый час
+                ForegroundRefreshService.shared.start()
+            case .background, .inactive:
+                // Приложение свернуто - останавливаем таймер и планируем фоновое обновление
+                ForegroundRefreshService.shared.stop()
                 BackgroundRefreshService.shared.schedule()
+            @unknown default:
+                break
             }
         }
     }

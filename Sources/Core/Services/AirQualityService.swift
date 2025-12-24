@@ -7,7 +7,7 @@ enum AirQualityError: Error {
 }
 
 final class AirQualityService: Sendable {
-    static let shared = AirQualityService()
+    nonisolated static let shared = AirQualityService()
     
     private let apiKey: String
     private let baseURL = "https://airquality.googleapis.com/v1/currentConditions:lookup"
