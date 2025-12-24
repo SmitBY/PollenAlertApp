@@ -42,8 +42,8 @@ struct HistoryView: View {
                 if !viewModel.pollenHistory.isEmpty {
                     Section("Динамика риска") {
                         PollenHistoryChart(history: viewModel.pollenHistory)
-                            .frame(height: 180)
-                            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 0, trailing: 16))
+                            .frame(height: 170)
+                            .listRowInsets(EdgeInsets(top: 16, leading: 8, bottom: 0, trailing: 8))
                     }
                 }
                 
@@ -82,7 +82,9 @@ struct PollenHistoryChart: View {
     private var dateRange: ClosedRange<Date>? {
         guard let last = history.last?.date else { return nil }
         let start = last.addingTimeInterval(-24 * 3600)
-        return start...last
+        // Добавляем 1 час в конце, чтобы метка последнего часа не обрезалась
+        let end = last.addingTimeInterval(3600)
+        return start...end
     }
     
     private var axisDates: [Date] {
@@ -91,23 +93,34 @@ struct PollenHistoryChart: View {
         var dates: [Date] = []
         let calendar = Calendar.current
         
-        // Округляем начало до ближайшего четного часа
+        // Начинаем с начала часа от нижней границы
         var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
-        if let hour = components.hour, hour % 2 != 0 {
-            components.hour = hour + 1
-        }
         components.minute = 0
         components.second = 0
-        
         var current = calendar.date(from: components) ?? range.lowerBound
         
-        while current <= range.upperBound {
-            dates.append(current)
+        // Генерируем метки каждые 2 часа
+        while current < range.upperBound.addingTimeInterval(-3600) {
+            if current >= range.lowerBound {
+                dates.append(current)
+            }
             guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
             current = next
         }
         
-        return dates
+        // Обязательно добавляем последний час из фактических данных
+        if let actualLastDate = history.last?.date {
+            var lastComponents = calendar.dateComponents([.year, .month, .day, .hour], from: actualLastDate)
+            lastComponents.minute = 0
+            lastComponents.second = 0
+            if let lastHour = calendar.date(from: lastComponents) {
+                if !dates.contains(where: { abs($0.timeIntervalSince(lastHour)) < 60 }) {
+                    dates.append(lastHour)
+                }
+            }
+        }
+        
+        return dates.sorted()
     }
     
     private var yDomain: ClosedRange<Double> {
@@ -150,7 +163,7 @@ struct PollenHistoryChart: View {
             AxisMarks(values: axisDates) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                     .foregroundStyle(Color.primary.opacity(0.1))
-                AxisValueLabel {
+                AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
                         Text(date.formatted(.dateTime.hour()))
                             .font(.system(size: 9))
@@ -174,6 +187,7 @@ struct PollenHistoryChart: View {
         }
         .chartXScale(domain: dateRange ?? (Date()...Date()))
         .chartYScale(domain: yDomain)
+        .padding(.horizontal, 4) // Уменьшили отступ по бокам
         .environment(\.timeZone, TimeZone.current)
     }
     
