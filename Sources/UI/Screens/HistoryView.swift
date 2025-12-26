@@ -89,18 +89,17 @@ struct PollenHistoryChart: View {
         guard let range = dateRange else { return [] }
         let calendar = Calendar.current
         
-        // Берем последний доступный час (округленный вниз)
+        // Последний целый час перед или в момент верхней границы
         var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.upperBound)
         components.minute = 0
         components.second = 0
-        let lastHour = calendar.date(from: components) ?? range.upperBound
+        let lastHour = calendar.date(from: components)!
         
         var dates: [Date] = []
         var current = lastHour
         
         // Идем назад на 24 часа с шагом 2 часа
         for _ in 0...12 {
-            // Добавляем небольшой допуск (1 минута) чтобы не терять метку из-за микро-секунд
             if current >= range.lowerBound.addingTimeInterval(-60) {
                 dates.append(current)
             }
@@ -148,13 +147,10 @@ struct PollenHistoryChart: View {
         }
         .chartXAxis {
             AxisMarks(values: axisDates) { value in
-                if let date = value.as(Date.self) {
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.primary.opacity(0.1))
-                    
-                    // Если это последняя метка, выравниваем её по правому краю, чтобы не исчезала
-                    let isLast = date == axisDates.last
-                    AxisValueLabel(anchor: isLast ? .topTrailing : .top) {
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.primary.opacity(0.1))
+                AxisValueLabel(anchor: .top) {
+                    if let date = value.as(Date.self) {
                         Text(date.formatted(.dateTime.hour()))
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
@@ -176,9 +172,9 @@ struct PollenHistoryChart: View {
             }
         }
         .chartXScale(domain: dateRange ?? (Date()...Date()))
-        .chartXSelection(enabled: false) // Отключаем лишние взаимодействия, которые могут расширять шкалу
         .chartYScale(domain: yDomain)
-        .padding(.horizontal, 4) // Уменьшили отступ по бокам
+        .padding(.leading, 4)
+        .padding(.trailing, 16)
         .environment(\.timeZone, TimeZone.current)
     }
     
