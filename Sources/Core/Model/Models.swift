@@ -33,7 +33,7 @@ struct PollenTile: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
-struct DiaryEntry: Codable, FetchableRecord, PersistableRecord {
+struct DiaryEntry: Codable, FetchableRecord, PersistableRecord, Identifiable {
     static var databaseTableName: String { "diary_entries" }
     
     var id: Int64?

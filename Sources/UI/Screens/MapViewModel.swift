@@ -38,9 +38,9 @@ class MapViewModel {
         // Проверяем, есть ли данные для центральной точки
         let hasCenterTile = tiles.contains { $0.h3Index == centerH3 }
         
-        // Проверяем, не устарели ли данные (старше 1 часа)
+        // Проверяем, не устарели ли данные (старше 2 часов)
         let isDataStale = tiles.first { $0.h3Index == centerH3 }
-            .map { Date().timeIntervalSince($0.updatedAt) > 3600 } ?? true
+            .map { Date().timeIntervalSince($0.updatedAt) > 7200 } ?? true
         
         // Если данных нет или они устарели - обновляем через API
         if !hasCenterTile || isDataStale {

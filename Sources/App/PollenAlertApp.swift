@@ -23,9 +23,6 @@ struct PollenAlertApp: App {
         
         // Регистрация фоновой задачи
         BackgroundRefreshService.shared.register()
-        
-        // Планируем первое обновление
-        BackgroundRefreshService.shared.schedule()
     }
 
     var body: some Scene {
@@ -40,7 +37,9 @@ struct PollenAlertApp: App {
             case .background, .inactive:
                 // Приложение свернуто - останавливаем таймер и планируем фоновое обновление
                 ForegroundRefreshService.shared.stop()
-                BackgroundRefreshService.shared.schedule()
+                Task {
+                    await BackgroundRefreshService.shared.schedule()
+                }
             @unknown default:
                 break
             }

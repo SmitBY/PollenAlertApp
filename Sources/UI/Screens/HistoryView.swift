@@ -4,6 +4,7 @@ import Charts
 import CoreLocation
 
 @Observable
+@MainActor
 class HistoryViewModel {
     var entries: [DiaryEntry] = []
     var pollenHistory: [PollenHistory] = []
@@ -16,15 +17,36 @@ class HistoryViewModel {
                 try DiaryEntry.order(DiaryEntry.Columns.date.desc).fetchAll(db)
             }
             
-            let fetchedPollen: [PollenHistory]
+            // Сразу обновляем записи дневника, чтобы они не ждали загрузки пыльцы
+            self.entries = fetchedEntries
+            print("📜 Загружено записей дневника: \(fetchedEntries.count)")
+            
+            var fetchedPollen: [PollenHistory]
             if let h3Index = h3Index {
-                fetchedPollen = try await pollenRepo.getHistory(h3Index: h3Index, limit: 168)
+                fetchedPollen = try await pollenRepo.getHistory(h3Index: h3Index, limit: 500)
             } else {
-                fetchedPollen = try await pollenRepo.getAllHistory(limit: 168)
+                fetchedPollen = try await pollenRepo.getAllHistory(limit: 500)
             }
             
-            self.entries = fetchedEntries
-            self.pollenHistory = fetchedPollen.sorted(by: { $0.date < $1.date })
+            // Сортируем и фильтруем микро-дубликаты (менее 1 минуты), которые ломают интерполяцию
+            let sorted = fetchedPollen.sorted(by: { $0.date < $1.date })
+            var filtered: [PollenHistory] = []
+            for point in sorted {
+                if let last = filtered.last {
+                    if abs(point.date.timeIntervalSince(last.date)) >= 60.0 {
+                        filtered.append(point)
+                    } else if point.date == sorted.last?.date {
+                        // Всегда оставляем самую последнюю точку
+                        filtered.removeLast()
+                        filtered.append(point)
+                    }
+                } else {
+                    filtered.append(point)
+                }
+            }
+            
+            self.pollenHistory = filtered
+            
         } catch {
             print("Failed to fetch history: \(error)")
         }
@@ -55,7 +77,7 @@ struct HistoryView: View {
                             description: Text("Ваша история самочувствия появится здесь после первой записи в дневник.")
                         )
                     } else {
-                        ForEach(viewModel.entries, id: \.id) { entry in
+                        ForEach(viewModel.entries) { entry in
                             HistoryRow(entry: entry)
                         }
                     }
@@ -80,31 +102,32 @@ struct PollenHistoryChart: View {
     let history: [PollenHistory]
     
     private var dateRange: ClosedRange<Date>? {
-        guard let last = history.last?.date else { return nil }
-        let start = last.addingTimeInterval(-24 * 3600)
-        return start...last
+        let now = Date()
+        let start = now.addingTimeInterval(-24 * 3600)
+        let end = now
+        
+        return start...end
     }
     
     private var axisDates: [Date] {
         guard let range = dateRange else { return [] }
-        let calendar = Calendar.current
-        
-        // Последний целый час перед или в момент верхней границы
-        var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.upperBound)
-        components.minute = 0
-        components.second = 0
-        let lastHour = calendar.date(from: components)!
         
         var dates: [Date] = []
-        var current = lastHour
+        let calendar = Calendar.current
         
-        // Идем назад на 24 часа с шагом 2 часа
-        for _ in 0...12 {
-            if current >= range.lowerBound.addingTimeInterval(-60) {
+        // Начинаем с начала часа от нижней границы
+        var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
+        components.minute = 0
+        components.second = 0
+        var current = calendar.date(from: components) ?? range.lowerBound
+        
+        // Генерируем метки каждые 2 часа до текущего момента
+        while current <= range.upperBound {
+            if current >= range.lowerBound {
                 dates.append(current)
             }
-            guard let prev = calendar.date(byAdding: .hour, value: -2, to: current) else { break }
-            current = prev
+            guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
+            current = next
         }
         
         return dates.sorted()
@@ -113,6 +136,7 @@ struct PollenHistoryChart: View {
     private var yDomain: ClosedRange<Double> {
         let minRisk = history.map { $0.riskLevel }.min() ?? 0
         let maxRisk = history.map { $0.riskLevel }.max() ?? 0
+        // Если риск всегда 0, показываем диапазон 0-10 чтобы линия не прилипала к самому низу
         if minRisk == 0 && maxRisk == 0 {
             return -2...100
         }
@@ -127,7 +151,7 @@ struct PollenHistoryChart: View {
                     y: .value("Риск", point.riskLevel)
                 )
                 .foregroundStyle(riskColor(point.riskLevel))
-                .lineStyle(StrokeStyle(lineWidth: 3))
+                .lineStyle(StrokeStyle(lineWidth: 3)) // Делаем линию толще
                 .interpolationMethod(.monotone)
                 
                 PointMark(
@@ -135,7 +159,7 @@ struct PollenHistoryChart: View {
                     y: .value("Риск", point.riskLevel)
                 )
                 .foregroundStyle(riskColor(point.riskLevel))
-                .symbolSize(10)
+                .symbolSize(10) // Добавляем точки чтобы видеть измерения
                 
                 AreaMark(
                     x: .value("Время", point.date),
@@ -173,8 +197,7 @@ struct PollenHistoryChart: View {
         }
         .chartXScale(domain: dateRange ?? (Date()...Date()))
         .chartYScale(domain: yDomain)
-        .padding(.leading, 4)
-        .padding(.trailing, 16)
+        .padding(.horizontal, 4) // Уменьшили отступ по бокам
         .environment(\.timeZone, TimeZone.current)
     }
     
