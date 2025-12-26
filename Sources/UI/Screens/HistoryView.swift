@@ -81,8 +81,17 @@ struct PollenHistoryChart: View {
     
     private var dateRange: ClosedRange<Date>? {
         guard let last = history.last?.date else { return nil }
-        let start = last.addingTimeInterval(-24 * 3600)
-        return start...last
+        let calendar = Calendar.current
+        
+        // Округляем время последнего измерения вверх до ближайшего часа
+        var components = calendar.dateComponents([.year, .month, .day, .hour], from: last)
+        components.minute = 0
+        components.second = 0
+        let baseHour = calendar.date(from: components) ?? last
+        let end = calendar.date(byAdding: .hour, value: 1, to: baseHour) ?? last
+        
+        let start = end.addingTimeInterval(-24 * 3600)
+        return start...end
     }
     
     private var axisDates: [Date] {
@@ -91,22 +100,17 @@ struct PollenHistoryChart: View {
         var dates: [Date] = []
         let calendar = Calendar.current
         
-        // Округляем начало диапазона до целого часа вниз
-        var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
-        components.minute = 0
-        components.second = 0
-        var current = calendar.date(from: components) ?? range.lowerBound
+        // Начинаем точно с начала диапазона
+        var current = range.lowerBound
         
-        // Генерируем метки каждые 2 часа, включая последнюю если она влезает
-        while current <= range.upperBound {
-            if current >= range.lowerBound {
-                dates.append(current)
-            }
+        // Генерируем ровно 13 меток (чтобы закрыть 24 часа шагом по 2 часа)
+        for _ in 0...12 {
+            dates.append(current)
             guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
             current = next
         }
         
-        return dates.sorted()
+        return dates
     }
     
     private var yDomain: ClosedRange<Double> {
