@@ -80,20 +80,11 @@ struct PollenHistoryChart: View {
     let history: [PollenHistory]
     
     private var dateRange: ClosedRange<Date>? {
-        guard let first = history.first?.date, let last = history.last?.date else { return nil }
-        
-        // Минимальный диапазон — 24 часа для консистентности
-        let minRange: TimeInterval = 24 * 3600
-        let actualRange = last.timeIntervalSince(first)
-        
-        if actualRange < minRange {
-            let start = last.addingTimeInterval(-minRange)
-            let end = last.addingTimeInterval(3600)
-            return start...end
-        } else {
-            // Показываем всю доступную историю с небольшим запасом
-            return first.addingTimeInterval(-3600)...last.addingTimeInterval(3600)
-        }
+        guard let last = history.last?.date else { return nil }
+        let start = last.addingTimeInterval(-24 * 3600)
+        // Добавляем небольшой запас в конце для красоты
+        let end = last.addingTimeInterval(1800)
+        return start...end
     }
     
     private var axisDates: [Date] {
@@ -101,19 +92,6 @@ struct PollenHistoryChart: View {
         
         var dates: [Date] = []
         let calendar = Calendar.current
-        let duration = range.upperBound.timeIntervalSince(range.lowerBound)
-        
-        // Динамический интервал меток
-        let intervalHours: Int
-        if duration <= 30 * 3600 {
-            intervalHours = 2 // Возвращаем 2 часа для коротких периодов
-        } else if duration <= 72 * 3600 {
-            intervalHours = 6
-        } else if duration <= 120 * 3600 {
-            intervalHours = 12
-        } else {
-            intervalHours = 24
-        }
         
         var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
         components.minute = 0
@@ -124,7 +102,7 @@ struct PollenHistoryChart: View {
             if current >= range.lowerBound {
                 dates.append(current)
             }
-            guard let next = calendar.date(byAdding: .hour, value: intervalHours, to: current) else { break }
+            guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
             current = next
         }
         
@@ -172,15 +150,9 @@ struct PollenHistoryChart: View {
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(Color.primary.opacity(0.1))
                     AxisValueLabel(anchor: .top) {
-                        let duration = dateRange?.upperBound.timeIntervalSince(dateRange?.lowerBound ?? Date()) ?? 0
-                        if duration > 48 * 3600 {
-                            // Если больше 2 дней, показываем день и час
-                            Text(date.formatted(.dateTime.day().hour()))
-                                .font(.system(size: 8))
-                        } else {
-                            Text(date.formatted(.dateTime.hour()))
-                                .font(.system(size: 9))
-                        }
+                        Text(date.formatted(.dateTime.hour()))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
