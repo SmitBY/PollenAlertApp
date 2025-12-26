@@ -219,11 +219,11 @@ struct HistoryRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(feelingEmoji(entry.feelingScore))
+                Text(DiaryEntry.emoji(for: entry.feelingScore))
                     .font(.title2)
             }
             
-            Text("Состояние: \(feelingText(entry.feelingScore))")
+            Text("Состояние: \(DiaryEntry.description(for: entry.feelingScore))")
                 .font(.headline)
             
             if let symptoms = entry.symptoms {
@@ -234,30 +234,6 @@ struct HistoryRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-    
-    private func feelingEmoji(_ score: Int) -> String {
-        switch score {
-        case 0: return "😫"
-        case 1: return "🙁"
-        case 2: return "😐"
-        case 3: return "🙂"
-        case 4: return "😊"
-        case 5: return "🤩"
-        default: return "❓"
-        }
-    }
-    
-    private func feelingText(_ score: Int) -> String {
-        switch score {
-        case 0: return "Очень плохо"
-        case 1: return "Плохо"
-        case 2: return "Так себе"
-        case 3: return "Нормально"
-        case 4: return "Хорошо"
-        case 5: return "Отлично"
-        default: return "Неизвестно"
-        }
     }
 }
 

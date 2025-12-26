@@ -57,6 +57,30 @@ struct DiaryEntry: Codable, FetchableRecord, PersistableRecord, Identifiable {
         static let symptoms = Column(CodingKeys.symptoms)
         static let h3Index = Column(CodingKeys.h3Index)
     }
+
+    static func emoji(for score: Int) -> String {
+        switch score {
+        case 0: return "😫"
+        case 1: return "🙁"
+        case 2: return "😐"
+        case 3: return "🙂"
+        case 4: return "😊"
+        case 5: return "🤩"
+        default: return "❓"
+        }
+    }
+
+    static func description(for score: Int) -> String {
+        switch score {
+        case 0: return "Очень плохо"
+        case 1: return "Плохо"
+        case 2: return "Так себе"
+        case 3: return "Нормально"
+        case 4: return "Хорошо"
+        case 5: return "Отлично"
+        default: return "Неизвестно"
+        }
+    }
 }
 
 struct PollenHistory: Codable, FetchableRecord, PersistableRecord, Identifiable {

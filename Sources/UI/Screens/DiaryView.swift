@@ -59,19 +59,23 @@ struct DiaryView: View {
                                     viewModel.feelingScore = score
                                 } label: {
                                     VStack {
+                                        Text(DiaryEntry.emoji(for: score))
+                                            .font(.title2)
                                         Text("\(score)")
-                                            .font(.headline)
-                                        Image(systemName: viewModel.feelingScore == score ? "face.smiling.fill" : "face.smiling")
-                                            .foregroundStyle(viewModel.feelingScore == score ? .orange : .gray)
+                                            .font(.caption)
                                     }
+                                    .padding(8)
+                                    .background(viewModel.feelingScore == score ? Color.orange.opacity(0.2) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.plain)
+                                .opacity(viewModel.feelingScore == score ? 1.0 : 0.5)
                             }
                         }
                         .padding(.vertical)
                         
-                        Text(feelingDescription(viewModel.feelingScore))
+                        Text(DiaryEntry.description(for: viewModel.feelingScore))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -109,18 +113,6 @@ struct DiaryView: View {
                     }
                 }
             }
-        }
-    }
-    
-    private func feelingDescription(_ score: Int) -> String {
-        switch score {
-        case 0: return "Очень плохо"
-        case 1: return "Плохо"
-        case 2: return "Так себе"
-        case 3: return "Нормально"
-        case 4: return "Хорошо"
-        case 5: return "Отлично"
-        default: return ""
         }
     }
 }
