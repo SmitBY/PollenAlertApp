@@ -100,6 +100,7 @@ struct PollenHistoryChart: View {
         
         // Идем назад на 24 часа с шагом 2 часа
         for _ in 0...12 {
+            // Добавляем небольшой допуск (1 минута) чтобы не терять метку из-за микро-секунд
             if current >= range.lowerBound.addingTimeInterval(-60) {
                 dates.append(current)
             }
@@ -150,7 +151,10 @@ struct PollenHistoryChart: View {
                 if let date = value.as(Date.self) {
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(Color.primary.opacity(0.1))
-                    AxisValueLabel(anchor: .top) {
+                    
+                    // Если это последняя метка, выравниваем её по правому краю, чтобы не исчезала
+                    let isLast = date == axisDates.last
+                    AxisValueLabel(anchor: isLast ? .topTrailing : .top) {
                         Text(date.formatted(.dateTime.hour()))
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
@@ -172,6 +176,7 @@ struct PollenHistoryChart: View {
             }
         }
         .chartXScale(domain: dateRange ?? (Date()...Date()))
+        .chartXSelection(enabled: false) // Отключаем лишние взаимодействия, которые могут расширять шкалу
         .chartYScale(domain: yDomain)
         .padding(.horizontal, 4) // Уменьшили отступ по бокам
         .environment(\.timeZone, TimeZone.current)
