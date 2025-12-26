@@ -81,36 +81,33 @@ struct PollenHistoryChart: View {
     
     private var dateRange: ClosedRange<Date>? {
         guard let last = history.last?.date else { return nil }
-        let calendar = Calendar.current
-        
-        // Округляем время последнего измерения вверх до ближайшего часа
-        var components = calendar.dateComponents([.year, .month, .day, .hour], from: last)
-        components.minute = 0
-        components.second = 0
-        let baseHour = calendar.date(from: components) ?? last
-        let end = calendar.date(byAdding: .hour, value: 1, to: baseHour) ?? last
-        
-        let start = end.addingTimeInterval(-24 * 3600)
-        return start...end
+        let start = last.addingTimeInterval(-24 * 3600)
+        return start...last
     }
     
     private var axisDates: [Date] {
         guard let range = dateRange else { return [] }
-        
-        var dates: [Date] = []
         let calendar = Calendar.current
         
-        // Начинаем точно с начала диапазона
-        var current = range.lowerBound
+        // Берем последний доступный час (округленный вниз)
+        var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.upperBound)
+        components.minute = 0
+        components.second = 0
+        let lastHour = calendar.date(from: components) ?? range.upperBound
         
-        // Генерируем ровно 13 меток (чтобы закрыть 24 часа шагом по 2 часа)
+        var dates: [Date] = []
+        var current = lastHour
+        
+        // Идем назад на 24 часа с шагом 2 часа
         for _ in 0...12 {
-            dates.append(current)
-            guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
-            current = next
+            if current >= range.lowerBound.addingTimeInterval(-60) {
+                dates.append(current)
+            }
+            guard let prev = calendar.date(byAdding: .hour, value: -2, to: current) else { break }
+            current = prev
         }
         
-        return dates
+        return dates.sorted()
     }
     
     private var yDomain: ClosedRange<Double> {
