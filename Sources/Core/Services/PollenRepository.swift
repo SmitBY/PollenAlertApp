@@ -9,12 +9,23 @@ final class PollenRepository: Sendable {
     private let tomorrowService = TomorrowService.shared
     
     /// Обновить данные для текущей локации
-    func updatePollenData(lat: Double, lon: Double) async throws {
+    func updatePollenData(lat: Double, lon: Double, force: Bool = false) async throws {
         // 1. Получаем H3 индекс
         let h3Index = GeoUtils.latLonToH3(lat: lat, lon: lon)
         guard !h3Index.isEmpty else { return }
         
-        // 2. Загружаем данные о пыльце
+        // 2. Проверяем, не обновлялись ли мы недавно (менее часа назад)
+        if !force {
+            if let existingTile = try await getTile(h3Index: h3Index) {
+                let timeSinceLastUpdate = Date().timeIntervalSince(existingTile.updatedAt)
+                if timeSinceLastUpdate < 3600 {
+                    print("ℹ️ Данные для \(h3Index) еще свежие (\(Int(timeSinceLastUpdate/60)) мин назад), пропуск обновления")
+                    return
+                }
+            }
+        }
+        
+        // 3. Загружаем данные о пыльце
         let (tree, grass, weed): (Double, Double, Double)
         do {
             (tree, grass, weed) = try await googlePollenService.fetchPollenData(lat: lat, lon: lon)

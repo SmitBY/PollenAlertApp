@@ -18,9 +18,9 @@ class HistoryViewModel {
             
             let fetchedPollen: [PollenHistory]
             if let h3Index = h3Index {
-                fetchedPollen = try await pollenRepo.getHistory(h3Index: h3Index, limit: 50)
+                fetchedPollen = try await pollenRepo.getHistory(h3Index: h3Index, limit: 168)
             } else {
-                fetchedPollen = try await pollenRepo.getAllHistory(limit: 50)
+                fetchedPollen = try await pollenRepo.getAllHistory(limit: 168)
             }
             
             self.entries = fetchedEntries
@@ -80,11 +80,20 @@ struct PollenHistoryChart: View {
     let history: [PollenHistory]
     
     private var dateRange: ClosedRange<Date>? {
-        guard let last = history.last?.date else { return nil }
-        let start = last.addingTimeInterval(-24 * 3600)
-        // Добавляем 1 час в конце, чтобы метка последнего часа не обрезалась
-        let end = last.addingTimeInterval(3600)
-        return start...end
+        guard let first = history.first?.date, let last = history.last?.date else { return nil }
+        
+        // Минимальный диапазон — 24 часа для консистентности
+        let minRange: TimeInterval = 24 * 3600
+        let actualRange = last.timeIntervalSince(first)
+        
+        if actualRange < minRange {
+            let start = last.addingTimeInterval(-minRange)
+            let end = last.addingTimeInterval(3600)
+            return start...end
+        } else {
+            // Показываем всю доступную историю с небольшим запасом
+            return first.addingTimeInterval(-3600)...last.addingTimeInterval(3600)
+        }
     }
     
     private var axisDates: [Date] {
@@ -92,32 +101,29 @@ struct PollenHistoryChart: View {
         
         var dates: [Date] = []
         let calendar = Calendar.current
+        let duration = range.upperBound.timeIntervalSince(range.lowerBound)
         
-        // Начинаем с начала часа от нижней границы
+        // Динамический интервал меток
+        let intervalHours: Int
+        if duration <= 26 * 3600 {
+            intervalHours = 4
+        } else if duration <= 74 * 3600 {
+            intervalHours = 12
+        } else {
+            intervalHours = 24
+        }
+        
         var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
         components.minute = 0
         components.second = 0
         var current = calendar.date(from: components) ?? range.lowerBound
         
-        // Генерируем метки каждые 2 часа
-        while current < range.upperBound.addingTimeInterval(-3600) {
+        while current < range.upperBound {
             if current >= range.lowerBound {
                 dates.append(current)
             }
-            guard let next = calendar.date(byAdding: .hour, value: 2, to: current) else { break }
+            guard let next = calendar.date(byAdding: .hour, value: intervalHours, to: current) else { break }
             current = next
-        }
-        
-        // Обязательно добавляем последний час из фактических данных
-        if let actualLastDate = history.last?.date {
-            var lastComponents = calendar.dateComponents([.year, .month, .day, .hour], from: actualLastDate)
-            lastComponents.minute = 0
-            lastComponents.second = 0
-            if let lastHour = calendar.date(from: lastComponents) {
-                if !dates.contains(where: { abs($0.timeIntervalSince(lastHour)) < 60 }) {
-                    dates.append(lastHour)
-                }
-            }
         }
         
         return dates.sorted()
@@ -126,7 +132,6 @@ struct PollenHistoryChart: View {
     private var yDomain: ClosedRange<Double> {
         let minRisk = history.map { $0.riskLevel }.min() ?? 0
         let maxRisk = history.map { $0.riskLevel }.max() ?? 0
-        // Если риск всегда 0, показываем диапазон 0-10 чтобы линия не прилипала к самому низу
         if minRisk == 0 && maxRisk == 0 {
             return -2...100
         }
@@ -141,7 +146,7 @@ struct PollenHistoryChart: View {
                     y: .value("Риск", point.riskLevel)
                 )
                 .foregroundStyle(riskColor(point.riskLevel))
-                .lineStyle(StrokeStyle(lineWidth: 3)) // Делаем линию толще
+                .lineStyle(StrokeStyle(lineWidth: 3))
                 .interpolationMethod(.monotone)
                 
                 PointMark(
@@ -149,7 +154,7 @@ struct PollenHistoryChart: View {
                     y: .value("Риск", point.riskLevel)
                 )
                 .foregroundStyle(riskColor(point.riskLevel))
-                .symbolSize(10) // Добавляем точки чтобы видеть измерения
+                .symbolSize(10)
                 
                 AreaMark(
                     x: .value("Время", point.date),
@@ -161,13 +166,19 @@ struct PollenHistoryChart: View {
         }
         .chartXAxis {
             AxisMarks(values: axisDates) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(Color.primary.opacity(0.1))
-                AxisValueLabel(anchor: .top) {
-                    if let date = value.as(Date.self) {
-                        Text(date.formatted(.dateTime.hour()))
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
+                if let date = value.as(Date.self) {
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.primary.opacity(0.1))
+                    AxisValueLabel(anchor: .top) {
+                        let duration = dateRange?.upperBound.timeIntervalSince(dateRange?.lowerBound ?? Date()) ?? 0
+                        if duration > 48 * 3600 {
+                            // Если больше 2 дней, показываем день и час
+                            Text(date.formatted(.dateTime.day().hour()))
+                                .font(.system(size: 8))
+                        } else {
+                            Text(date.formatted(.dateTime.hour()))
+                                .font(.system(size: 9))
+                        }
                     }
                 }
             }
