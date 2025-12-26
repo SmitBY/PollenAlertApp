@@ -105,9 +105,11 @@ struct PollenHistoryChart: View {
         
         // Динамический интервал меток
         let intervalHours: Int
-        if duration <= 26 * 3600 {
-            intervalHours = 4
-        } else if duration <= 74 * 3600 {
+        if duration <= 30 * 3600 {
+            intervalHours = 2 // Возвращаем 2 часа для коротких периодов
+        } else if duration <= 72 * 3600 {
+            intervalHours = 6
+        } else if duration <= 120 * 3600 {
             intervalHours = 12
         } else {
             intervalHours = 24
