@@ -82,9 +82,7 @@ struct PollenHistoryChart: View {
     private var dateRange: ClosedRange<Date>? {
         guard let last = history.last?.date else { return nil }
         let start = last.addingTimeInterval(-24 * 3600)
-        // Добавляем небольшой запас в конце для красоты
-        let end = last.addingTimeInterval(1800)
-        return start...end
+        return start...last
     }
     
     private var axisDates: [Date] {
@@ -93,12 +91,14 @@ struct PollenHistoryChart: View {
         var dates: [Date] = []
         let calendar = Calendar.current
         
+        // Округляем начало диапазона до целого часа вниз
         var components = calendar.dateComponents([.year, .month, .day, .hour], from: range.lowerBound)
         components.minute = 0
         components.second = 0
         var current = calendar.date(from: components) ?? range.lowerBound
         
-        while current < range.upperBound {
+        // Генерируем метки каждые 2 часа, включая последнюю если она влезает
+        while current <= range.upperBound {
             if current >= range.lowerBound {
                 dates.append(current)
             }
